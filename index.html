@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ComicSlides">
+<style>:root{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}img{max-width:100%}</style>
+<title>ComicSlides</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#14161a">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&display=swap">
+<style>
+/* Layout: pocket reader. Wordmark, one command bar, a quiet shelf. The comic supplies the colour. */
+:root{
+  --bg:#14161a; --surface:#1d2026; --surface2:#272b33; --line:#343944;
+  --fg:#ecebe6; --muted:#9b9ea6; --accent:#f2b544; --accent-fg:#1a1405; --danger:#ff8a80;
+  --font-display:"Bangers",Impact,"Arial Narrow Bold",sans-serif;
+  --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{
+  margin:0;color:var(--fg);font:15px/1.45 var(--font-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:22px 56px;-webkit-text-size-adjust:100%;
+}
+.wrap{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{margin:0;font:400 40px/1 var(--font-display);letter-spacing:.05em;color:var(--accent)}
+h2{margin:0;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tag{margin:6px 0 0;color:var(--muted);max-width:46ch;text-wrap:balance}
+.muted{color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.cmd{display:flex;gap:8px;flex-wrap:wrap}
+.cmd input{flex:1 1 220px;min-width:0}
+input[type=text],input[type=url],textarea,select{
+  width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:13px 14px;font-size:16px;
+}
+textarea{min-height:110px;resize:vertical;font:13px/1.4 ui-monospace,Menlo,monospace}
+.primary{background:var(--accent);color:var(--accent-fg);border:0;border-radius:10px;padding:13px 22px;font-weight:700;font-size:16px;cursor:pointer;min-height:48px}
+.primary:disabled{opacity:.5}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.panel[hidden]{display:none}
+.track{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.track i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.msg.error{border-color:#6b3a37}
+.msg b{display:block}
+.msg .acts{display:flex;gap:8px;flex-wrap:wrap}
+details.panel summary{cursor:pointer;font-weight:600;min-height:28px}
+details.panel[open] summary{margin-bottom:6px}
+.sect{display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid var(--line)}
+.sect:first-of-type{border-top:0;padding-top:0}
+.sect h3{margin:0;font-size:14px}
+.sect p{margin:0;font-size:13px;color:var(--muted)}
+code.bm{display:block;background:var(--surface2);border-radius:8px;padding:8px 10px;font:12px/1.4 ui-monospace,Menlo,monospace;overflow-x:auto;white-space:nowrap}
+input[type=file]{font-size:14px;max-width:100%}
+
+.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.card{display:flex;flex-direction:column;gap:8px;min-width:0}
+.cover{display:block;width:100%;aspect-ratio:3/4;border:0;padding:0;border-radius:8px;overflow:hidden;background:var(--surface2);cursor:pointer}
+.cover img{width:100%;height:100%;object-fit:cover;display:block}
+.card .t{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.card .m{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.card .row{display:flex;gap:6px;flex-wrap:wrap}
+.card .row button{flex:1 1 auto;font-size:13px;padding:7px 8px;min-height:36px}
+.card .row .danger{color:var(--danger)}
+.empty{grid-column:1/-1;color:var(--muted);margin:0}
+.foot{font-size:12px;color:var(--muted)}
+
+/* reader */
+#reader{position:fixed;inset:0;background:#000;color:#fff;z-index:50;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+#reader[hidden]{display:none}
+#stage{position:absolute;inset:0;touch-action:none;overflow:hidden}
+#strip{position:absolute;inset:0;will-change:transform}
+.view{position:absolute;top:0;bottom:0;width:100%;display:flex;align-items:center;justify-content:center;will-change:transform}
+.view.rtl{flex-direction:row-reverse}
+.view img{flex:1 1 0;min-width:0;width:100%;height:100%;object-fit:contain;-webkit-user-drag:none;pointer-events:none}
+#scroller{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;background:#000}
+#scroller[hidden],#stage[hidden]{display:none}
+#scroller img{display:block;width:100%;max-width:820px;margin:0 auto;height:auto;background:#0c0d10}
+.rbar{position:absolute;left:0;right:0;display:flex;align-items:center;gap:8px;
+  padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px));
+  transition:opacity .2s,transform .2s;z-index:5}
+.rbar.top{top:0;padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:22px;background:linear-gradient(#000c,#0000)}
+.rbar.bottom{bottom:0;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-top:22px;background:linear-gradient(#0000,#000c)}
+.ui-off .rbar{opacity:0;pointer-events:none}
+.ui-off .rbar.top{transform:translateY(-8px)}
+.ui-off .rbar.bottom{transform:translateY(8px)}
+.ib{flex:none;width:44px;height:44px;border:0;background:transparent;color:#fff;display:grid;place-items:center;border-radius:50%;cursor:pointer}
+.ib:active{background:#fff2}
+.ib svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+#rtitle{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+#counter{font-variant-numeric:tabular-nums;font-size:13px;color:#ddd;flex:none}
+#seek{flex:1;min-width:0;accent-color:var(--accent)}
+#sheet{position:absolute;inset:0;z-index:8;display:flex;align-items:flex-end;background:#0008}
+#sheet[hidden]{display:none}
+.sheet{width:100%;max-width:560px;margin:0 auto;background:var(--surface);color:var(--fg);border-radius:16px 16px 0 0;
+  padding:16px max(16px,env(safe-area-inset-left,0px)) calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+.sheet .lbl{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;border:0;background:transparent;padding:11px 6px;cursor:pointer;min-height:44px}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-fg);font-weight:700}
+@media (prefers-reduced-motion:reduce){.rbar,.track i{transition:none}}
+</style>
+
+<main class="wrap" id="home">
+  <header>
+    <h1>ComicSlides</h1>
+    <p class="tag">Paste a comic chapter link. The pages are saved on this phone and open as a slideshow you can read offline.</p>
+  </header>
+
+  <form id="loadForm" class="cmd" autocomplete="off">
+    <label class="sr" for="url">Comic chapter link</label>
+    <input id="url" type="text" inputmode="url" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Paste a chapter link">
+    <button id="go" class="primary" type="submit">Load</button>
+  </form>
+
+  <div id="status" class="panel" hidden role="status">
+    <div id="statusText">Working…</div>
+    <div class="track"><i id="bar"></i></div>
+    <div><button id="cancel" class="ghost" type="button">Cancel</button></div>
+  </div>
+  <div id="msg" class="panel msg" hidden role="alert"></div>
+
+  <details id="more" class="panel">
+    <summary>Link not loading? Other ways to add a comic</summary>
+    <div class="sect">
+      <h3>Choose images from this phone</h3>
+      <p>Long-press the pages in Safari and save them to Photos, then pick them here.</p>
+      <input id="files" type="file" accept="image/*" multiple>
+    </div>
+    <div class="sect">
+      <h3>Paste the page source</h3>
+      <p>Some sites build their pages with scripts, so a plain download shows no images. Copy the rendered page from your browser and paste it here. Keep the chapter link in the box above so relative image addresses resolve.</p>
+      <textarea id="src" placeholder="Paste page HTML here" spellcheck="false"></textarea>
+      <button id="buildSrc" class="ghost" type="button">Build from pasted source</button>
+      <p>Bookmarklet that copies the open page:</p>
+      <code class="bm" id="bmCode">javascript:navigator.clipboard.writeText(document.documentElement.outerHTML)</code>
+      <button id="copyBm" class="ghost" type="button">Copy bookmarklet</button>
+    </div>
+    <div class="sect">
+      <h3>Title and helper address</h3>
+      <label class="sr" for="ctitle">Comic title</label>
+      <input id="ctitle" type="text" placeholder="Title (optional, used for pasted or picked pages)">
+      <label class="sr" for="proxy">Custom CORS helper</label>
+      <input id="proxy" type="text" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="Your own helper, e.g. https://my-proxy.example/?u={url}">
+      <p>Sites usually block other websites from reading them. ComicSlides tries a direct request first, then public helper services, then your own helper if you set one.</p>
+    </div>
+  </details>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2>Saved comics</h2>
+    <div id="shelf" class="shelf"></div>
+    <p id="usage" class="foot"></p>
+  </section>
+
+  <p class="foot">For personal offline reading. ComicSlides does not get around logins or paywalls, and only reads pages you could open yourself.</p>
+</main>
+
+<div id="reader" hidden>
+  <div id="stage"><div id="strip"></div></div>
+  <div id="scroller" hidden></div>
+  <div class="rbar top">
+    <button class="ib" id="rBack" aria-label="Back to library"></button>
+    <div id="rtitle"></div>
+    <div id="counter"></div>
+    <button class="ib" id="rMore" aria-label="Reader settings"></button>
+  </div>
+  <div class="rbar bottom">
+    <button class="ib" id="rPrev" aria-label="Previous page"></button>
+    <input id="seek" type="range" min="1" max="1" value="1" aria-label="Page">
+    <button class="ib" id="rNext" aria-label="Next page"></button>
+    <button class="ib" id="rPlay" aria-label="Auto-play"></button>
+  </div>
+  <div id="sheet" hidden>
+    <div class="sheet">
+      <div><div class="lbl">Layout</div>
+        <div class="seg" id="segMode">
+          <button data-mode="single" aria-pressed="true">Single</button>
+          <button data-mode="double" aria-pressed="false">Double</button>
+          <button data-mode="scroll" aria-pressed="false">Scroll</button>
+        </div></div>
+      <div><div class="lbl">Reading direction</div>
+        <div class="seg" id="segDir">
+          <button data-rtl="0" aria-pressed="true">Left to right</button>
+          <button data-rtl="1" aria-pressed="false">Right to left</button>
+        </div></div>
+      <div><div class="lbl">Auto-play speed</div>
+        <select id="sec" aria-label="Auto-play speed">
+          <option value="2">Fast, 2 seconds a page</option>
+          <option value="4">Medium, 4 seconds a page</option>
+          <option value="7">Slow, 7 seconds a page</option>
+          <option value="12">Very slow, 12 seconds a page</option>
+        </select></div>
+      <div style="display:flex;gap:8px">
+        <button class="ghost" id="fsBtn" type="button" style="flex:1">Full screen</button>
+        <button class="primary" id="sheetClose" type="button" style="flex:1">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(()=>{
+'use strict';
+const $=s=>document.querySelector(s);
+const h=(tag,attrs={},...kids)=>{const e=document.createElement(tag);for(const k in attrs){const v=attrs[k];if(k==='class')e.className=v;else if(k==='text')e.textContent=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else e.setAttribute(k,v);}kids.flat().forEach(c=>e.append(c));return e;};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const IC={
+  back:'<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>',
+  next:'<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>',
+  play:'<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" stroke="none"/></svg>',
+  pause:'<svg viewBox="0 0 24 24"><path d="M7 5h3.2v14H7zM13.8 5H17v14h-3.2z" fill="currentColor" stroke="none"/></svg>',
+  more:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.8" fill="currentColor" stroke="none"/></svg>'
+};
+$('#rBack').innerHTML=IC.back;$('#rPrev').innerHTML=IC.back;$('#rNext').innerHTML=IC.next;
+$('#rPlay').innerHTML=IC.play;$('#rMore').innerHTML=IC.more;
+
+/* ---------- settings ---------- */
+const S={proxy:'',mode:'single',rtl:false,sec:4};
+try{Object.assign(S,JSON.parse(localStorage.getItem('cs-settings')||'{}'));}catch(e){}
+const saveSettings=()=>{try{localStorage.setItem('cs-settings',JSON.stringify(S));}catch(e){}};
+
+/* ---------- IndexedDB ---------- */
+let dbp=null;
+function db(){
+  if(!dbp)dbp=new Promise((res,rej)=>{
+    const r=indexedDB.open('comicslides',1);
+    r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('comics',{keyPath:'id'});d.createObjectStore('pages');};
+    r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error||new Error('Storage unavailable'));
+  });
+  return dbp;
+}
+async function idbReq(store,mode,fn){
+  const d=await db();
+  return new Promise((res,rej)=>{
+    const t=d.transaction(store,mode);let out;
+    out=fn(t);
+    t.oncomplete=()=>res(out&&'result' in out?out.result:undefined);
+    t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error||new Error('Storage failed'));
+  });
+}
+const idbGet=(store,key)=>idbReq(store,'readonly',t=>t.objectStore(store).get(key));
+const idbAll=store=>idbReq(store,'readonly',t=>t.objectStore(store).getAll());
+const idbPutMeta=meta=>idbReq('comics','readwrite',t=>t.objectStore('comics').put(meta));
+async function idbSaveComic(meta,slices){
+  const d=await db();
+  return new Promise((res,rej)=>{
+    const t=d.transaction(['pages','comics'],'readwrite');
+    const ps=t.objectStore('pages');
+    slices.forEach((s,i)=>ps.put(s.blob,meta.id+':'+i));
+    t.objectStore('comics').put(meta);
+    t.oncomplete=()=>res();t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error||new Error('Storage failed'));
+  });
+}
+async function idbDeleteComic(id){
+  const d=await db();
+  return new Promise((res,rej)=>{
+    const t=d.transaction(['pages','comics'],'readwrite');
+    t.objectStore('pages').delete(IDBKeyRange.bound(id+':',id+':￿'));
+    t.objectStore('comics').delete(id);
+    t.oncomplete=()=>res();t.onerror=()=>rej(t.error);
+  });
+}
+
+/* ---------- networking ---------- */
+const PROXIES=[
+  u=>'https://corsproxy.io/?'+encodeURIComponent(u),
+  u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+  u=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u)
+];
+function attemptList(){
+  const list=[u=>u];
+  const c=(S.proxy||'').trim();
+  if(c)list.push(u=>c.includes('{url}')?c.replace('{url}',encodeURIComponent(u)):c+encodeURIComponent(u));
+  return list.concat(PROXIES);
+}
+async function timedFetch(url,ms){
+  const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);
+  try{return await fetch(url,{signal:c.signal,referrerPolicy:'no-referrer',credentials:'omit'});}
+  finally{clearTimeout(t);}
+}
+async function fetchSmart(url,kind){
+  let last=null;
+  for(const mk of attemptList()){
+    try{
+      const r=await timedFetch(mk(url),kind==='text'?20000:30000);
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      if(kind==='text'){const tx=await r.text();if(tx.length<200)throw new Error('Empty response');return tx;}
+      const b=await r.blob();
+      if(b.size<1500||(b.type&&!/^image\//.test(b.type)&&!/octet/.test(b.type)))throw new Error('Not an image');
+      return b;
+    }catch(e){last=e;}
+  }
+  throw last||new Error('Blocked');
+}
+
+/* ---------- finding comic pages in HTML ---------- */
+const BAD=/(logo|icon|avatar|banner|sprite|favicon|emoji|badge|button|loading|placeholder|blank|spacer|pixel|profile|social|thumb|ads?[-_.]|advert)/i;
+const BADEXT=/\.(gif|svg|ico)(\?|$)/i;
+const SKIP='header,footer,nav,aside,[class*="comment"],[class*="related"],[class*="sidebar"],[class*="recommend"],[class*="popular"],[id*="comment"]';
+const RE=/https?:\/\/[^"'\s<>()\\]+?\.(?:jpe?g|png|webp|avif)(?:\?[^"'\s<>()\\]*)?/gi;
+const LAZY=['data-src','data-lazy-src','data-original','data-lazy','data-url','data-echo','data-srcset','srcset','src'];
+function fromSrcset(s){let best='',bw=-1;(s||'').split(',').forEach(p=>{const a=p.trim().split(/\s+/);if(!a[0])return;const w=parseFloat(a[1])||1;if(w>bw){bw=w;best=a[0];}});return best;}
+function elUrl(e){
+  for(const a of LAZY){
+    let v=e.getAttribute(a);if(!v)continue;v=v.trim();
+    if(a.includes('srcset'))v=fromSrcset(v);
+    if(!v||/^data:/i.test(v))continue;
+    return v;
+  }
+  return '';
+}
+function lastNum(u){
+  let f='';try{f=decodeURIComponent(u.split('?')[0].split('/').pop()||'');}catch(e){f=u;}
+  f=f.replace(/\.[a-z0-9]+$/i,'');const m=f.match(/(\d+)(?!.*\d)/);return m?parseInt(m[1],10):null;
+}
+function extractPages(doc,html,base){
+  const cands=[],seen=new Set();
+  const push=(raw,el)=>{
+    if(!raw)return;let u;try{u=new URL(raw,base).href;}catch(e){return;}
+    if(!/^https?:/.test(u))return;
+    const key=u.split('#')[0];if(seen.has(key))return;
+    const path=key.split('?')[0];
+    if(BADEXT.test(key)||BAD.test(path.split('/').pop()||''))return;
+    if(el){
+      const w=+el.getAttribute('width')||0,hh=+el.getAttribute('height')||0;
+      if((w&&w<200)||(hh&&hh<200))return;
+      if(el.closest&&el.closest(SKIP))return;
+    }
+    seen.add(key);cands.push(key);
+  };
+  doc.querySelectorAll('img,picture source').forEach(e=>push(elUrl(e),e));
+  doc.querySelectorAll('[style*="url("]').forEach(e=>{const m=(e.getAttribute('style')||'').match(/url\((['"]?)(.*?)\1\)/);if(m)push(m[2],e);});
+  if(cands.length<3)(html.replace(/\\\//g,'/').match(RE)||[]).forEach(u=>push(u,null));
+  let list=cands;
+  const dirs=new Map();
+  list.forEach(u=>{const d=u.split('?')[0].replace(/[^/]*$/,'');dirs.set(d,(dirs.get(d)||0)+1);});
+  let top='',tc=0;dirs.forEach((c,d)=>{if(c>tc){tc=c;top=d;}});
+  if(tc>=4&&tc>=list.length*0.5)list=list.filter(u=>u.split('?')[0].startsWith(top));
+  const nums=list.map(lastNum);
+  if(list.length>1&&nums.filter(n=>n!==null).length>=list.length*0.8){
+    list=list.map((u,i)=>({u,n:nums[i]===null?1e9:nums[i],i})).sort((a,b)=>a.n-b.n||a.i-b.i).map(x=>x.u);
+  }
+  return list;
+}
+function looksLikeComic(url,doc,n){
+  const kw=/(chapter|chap|\bch[-_.]?\d|manga|manhwa|manhua|webtoon|comic|issue|episode|\bep[-_.]?\d|read|scan|toon|strip)/i;
+  let score=n>=6?2:n>=3?1:0;
+  if(kw.test(url))score++;
+  if(kw.test(doc.title||''))score++;
+  const meta=doc.querySelector('meta[property="og:site_name"],meta[name="description"],meta[name="keywords"]');
+  if(meta&&/(comic|manga|chapter|webtoon)/i.test(meta.content||''))score++;
+  return score>=2;
+}
+function normUrl(s){
+  s=(s||'').trim();if(!s)return null;
+  if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(s))s='https://'+s;
+  try{const u=new URL(s);return /^https?:$/.test(u.protocol)?u.href:null;}catch(e){return null;}
+}
+function cleanTitle(t,url){
+  t=(t||'').replace(/\s+/g,' ').trim().replace(/\s*[|\-–—]\s*[^|\-–—]*$/,'').trim();
+  if(t)return t.slice(0,90);
+  try{return new URL(url).hostname.replace(/^www\./,'');}catch(e){return 'My comic';}
+}
+
+/* ---------- image processing (all on this phone) ---------- */
+async function loadBitmap(blob){
+  if('createImageBitmap' in window){
+    const b=await createImageBitmap(blob);
+    return {src:b,w:b.width,h:b.height,close:()=>{try{b.close();}catch(e){}}};
+  }
+  const url=URL.createObjectURL(blob);
+  try{
+    const im=new Image();im.src=url;await im.decode();
+    return {src:im,w:im.naturalWidth,h:im.naturalHeight,close:()=>{}};
+  }finally{URL.revokeObjectURL(url);}
+}
+function encode(cv){
+  return new Promise(res=>cv.toBlob(b=>{
+    if(b&&b.type==='image/webp')return res(b);
+    cv.toBlob(j=>res(j),'image/jpeg',0.85);
+  },'image/webp',0.82));
+}
+async function processImage(blob){
+  const bm=await loadBitmap(blob);
+  try{
+    const W=bm.w,H=bm.h;
+    if(W<300||H<300)return null;
+    const sliceH=H>W*2.4?Math.round(W*1.7):H;
+    const ranges=[];
+    for(let y=0;y<H;y+=sliceH)ranges.push([y,Math.min(sliceH,H-y)]);
+    if(ranges.length>1&&ranges[ranges.length-1][1]<sliceH*0.35){
+      const last=ranges.pop();ranges[ranges.length-1][1]+=last[1];
+    }
+    const scale=Math.min(1,1400/W),dw=Math.round(W*scale);
+    const out=[];
+    for(const [y,hh] of ranges){
+      if(hh<150)continue;
+      const dh=Math.round(hh*scale);
+      const cv=document.createElement('canvas');cv.width=dw;cv.height=dh;
+      cv.getContext('2d').drawImage(bm.src,0,y,W,hh,0,0,dw,dh);
+      const b=await encode(cv);cv.width=cv.height=0;
+      if(b)out.push({blob:b,w:dw,h:dh});
+    }
+    return out;
+  }finally{bm.close();}
+}
+async function makeCover(blob){
+  const bm=await loadBitmap(blob);
+  try{
+    const w=260,h=Math.round(bm.h*w/bm.w);
+    const cv=document.createElement('canvas');cv.width=w;cv.height=Math.min(h,w*2);
+    cv.getContext('2d').drawImage(bm.src,0,0,bm.w,Math.round(cv.height*bm.w/w),0,0,w,cv.height);
+    const b=await new Promise(r=>cv.toBlob(r,'image/jpeg',0.8));cv.width=cv.height=0;return b;
+  }finally{bm.close();}
+}
+
+/* ---------- import job ---------- */
+let job=null;
+function setStatus(text,frac){
+  $('#status').hidden=false;$('#statusText').textContent=text;
+  if(frac!==undefined)$('#bar').style.width=Math.round(frac*100)+'%';
+}
+const hideStatus=()=>{$('#status').hidden=true;$('#bar').style.width='0';};
+function hideMsg(){$('#msg').hidden=true;$('#msg').replaceChildren();}
+function showMsg(kind,title,body,actions){
+  const m=$('#msg');m.replaceChildren();m.hidden=false;m.className='panel msg '+kind;
+  m.append(h('b',{text:title}),h('span',{text:body}));
+  if(actions&&actions.length){const row=h('div',{class:'acts'});actions.forEach(a=>row.append(h('button',{class:'ghost',type:'button',text:a.label,onclick:a.fn})));m.append(row);}
+}
+function setBusy(b){$('#go').disabled=b;$('#buildSrc').disabled=b;$('#files').disabled=b;}
+
+async function fetchImage(url){return fetchSmart(url,'blob');}
+
+async function importComic(title,url,items){
+  job={cancelled:false};
+  setBusy(true);hideMsg();
+  try{
+    const total=items.length;
+    setStatus(`Found ${total} images. Saving…`,0);
+    const results=new Array(total);let done=0,next=0;
+    const run=async()=>{
+      for(;;){
+        if(job.cancelled)return;
+        const i=next++;if(i>=total)return;
+        try{
+          const blob=items[i].blob||await fetchImage(items[i].url);
+          results[i]=await processImage(blob);
+        }catch(e){results[i]=null;}
+        done++;setStatus(`Saving ${done}/${total} pages…`,done/total);
+      }
+    };
+    await Promise.all([run(),run(),run()]);
+    if(job.cancelled){hideStatus();return;}
+    const slices=results.filter(Boolean).flat();
+    if(slices.length<2){
+      hideStatus();
+      showMsg('error','No readable pages',total?'The images could not be downloaded or were too small to be comic pages. If the site blocks downloads, use "Choose images from this phone" under Other ways.':'No images were found.',[]);
+      $('#more').open=true;return;
+    }
+    setStatus('Finishing…',1);
+    const cover=await makeCover(slices[0].blob).catch(()=>null);
+    const meta={id:'c'+Date.now().toString(36),title,url:url||'',created:Date.now(),count:slices.length,
+      bytes:slices.reduce((a,s)=>a+s.blob.size,0),dims:slices.map(s=>[s.w,s.h]),cover,last:0,opened:Date.now()};
+    try{await idbSaveComic(meta,slices);}
+    catch(e){
+      hideStatus();
+      showMsg('error','Storage is full','This phone has no room left for these pages. Delete a saved comic below, then try again.',[]);return;
+    }
+    try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
+    hideStatus();
+    await refreshLibrary();
+    const skipped=total-results.filter(Boolean).length;
+    showMsg('note','Saved '+meta.count+' pages',skipped>0?skipped+' images were skipped because they were too small or failed to download.':'Ready to read offline.',[{label:'Read now',fn:()=>openComic(meta.id)}]);
+  }catch(e){
+    hideStatus();showMsg('error','Something went wrong',String(e&&e.message||e),[]);
+  }finally{setBusy(false);job=null;}
+}
+
+async function pagesFromHtml(html,url,force){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  let base=url||'';
+  const bt=doc.querySelector('base[href]');
+  if(bt){try{base=new URL(bt.getAttribute('href'),url||undefined).href;}catch(e){}}
+  const urls=extractPages(doc,html,base||'https://invalid.local/');
+  if(!force&&!looksLikeComic(url||'',doc,urls.length)){
+    showMsg('error','This does not look like a comic page',"ComicSlides only opens comic and manga chapter pages. If this is one, you can load it anyway.",
+      [{label:'Load anyway',fn:()=>{hideMsg();importComic(cleanTitle(doc.title,url),url,urls.map(u=>({url:u})));}}]);
+    return;
+  }
+  if(urls.length<2){
+    showMsg('error','No comic pages found','The page has no chapter images in its source. Some sites build pages with scripts. Try "Paste the page source" or "Choose images from this phone".',[]);
+    $('#more').open=true;return;
+  }
+  await importComic(cleanTitle(doc.title,url),url,urls.map(u=>({url:u})));
+}
+
+async function loadUrl(){
+  const url=normUrl($('#url').value);
+  hideMsg();
+  if(!url){showMsg('error','That is not a web address','Paste the full link to a comic chapter, for example https://example.com/manga/chapter-1.',[]);return;}
+  if(!navigator.onLine){showMsg('error','No internet connection','Connect to the internet to open a link. Saved comics still open offline.',[]);return;}
+  setBusy(true);setStatus('Opening the page…',0.05);
+  let html;
+  try{html=await fetchSmart(url,'text');}
+  catch(e){
+    hideStatus();setBusy(false);
+    showMsg('error',"Couldn't read that page","The site blocked the request, and the helper services could not fetch it either. Use one of the other ways below.",[]);
+    $('#more').open=true;return;
+  }
+  hideStatus();setBusy(false);
+  await pagesFromHtml(html,url,false);
+}
+
+$('#loadForm').addEventListener('submit',e=>{e.preventDefault();loadUrl();});
+$('#cancel').addEventListener('click',()=>{if(job)job.cancelled=true;hideStatus();setBusy(false);});
+$('#buildSrc').addEventListener('click',async()=>{
+  hideMsg();
+  const html=$('#src').value;
+  if(html.length<200){showMsg('error','Nothing to build from','Paste the full page source into the box first.',[]);return;}
+  await pagesFromHtml(html,normUrl($('#url').value)||'',true);
+});
+$('#files').addEventListener('change',async e=>{
+  const files=[...e.target.files].filter(f=>/^image\//.test(f.type)||/\.(jpe?g|png|webp|avif|heic)$/i.test(f.name));
+  e.target.value='';
+  hideMsg();
+  if(files.length<2){showMsg('error','Pick at least two images','Select every page of the chapter in one go.',[]);return;}
+  files.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  await importComic($('#ctitle').value.trim()||'My comic','',files.map(f=>({blob:f})));
+});
+$('#copyBm').addEventListener('click',async()=>{
+  const b=$('#copyBm');
+  try{await navigator.clipboard.writeText($('#bmCode').textContent);b.textContent='Copied';}
+  catch(e){const r=document.createRange();r.selectNodeContents($('#bmCode'));const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Selected, press Copy';}
+  setTimeout(()=>{b.textContent='Copy bookmarklet';},2200);
+});
+$('#proxy').value=S.proxy||'';
+$('#proxy').addEventListener('change',e=>{S.proxy=e.target.value.trim();saveSettings();});
+try{const q=new URLSearchParams(location.search).get('url');if(q)$('#url').value=q;}catch(e){}
+
+/* ---------- library ---------- */
+let library=[],coverUrls=[];
+const fmtMB=b=>b>=1e9?(b/1e9).toFixed(1)+' GB':(b/1e6).toFixed(b<1e7?1:0)+' MB';
+async function refreshLibrary(){
+  try{library=await idbAll('comics');}catch(e){library=[];}
+  library.sort((a,b)=>(b.opened||b.created)-(a.opened||a.created));
+  renderLibrary();
+}
+function renderLibrary(){
+  const shelf=$('#shelf');shelf.replaceChildren();
+  coverUrls.forEach(u=>URL.revokeObjectURL(u));coverUrls=[];
+  if(!library.length)shelf.append(h('p',{class:'empty',text:'Nothing saved yet. Paste a chapter link above and it will appear here.'}));
+  library.forEach(c=>{
+    const cv=h('button',{class:'cover',type:'button','aria-label':'Read '+c.title,onclick:()=>openComic(c.id)});
+    if(c.cover){const u=URL.createObjectURL(c.cover);coverUrls.push(u);cv.append(h('img',{src:u,alt:''}));}
+    const del=h('button',{class:'ghost danger',type:'button',text:'Delete'});
+    let armed=0;
+    del.addEventListener('click',async()=>{
+      if(!armed){armed=1;del.textContent='Tap to confirm';setTimeout(()=>{armed=0;del.textContent='Delete';},3000);return;}
+      await idbDeleteComic(c.id);await refreshLibrary();
+    });
+    const exp=h('button',{class:'ghost',type:'button',text:'Export CBZ'});
+    exp.addEventListener('click',()=>exportCbz(c,exp));
+    shelf.append(h('div',{class:'card'},cv,
+      h('div',{class:'t',text:c.title}),
+      h('div',{class:'m',text:`${c.count} pages · ${fmtMB(c.bytes||0)}${c.last?` · page ${c.last+1}`:''}`}),
+      h('div',{class:'row'},h('button',{class:'ghost',type:'button',text:'Read',onclick:()=>openComic(c.id)}),exp,del)));
+  });
+  updateUsage();
+}
+async function updateUsage(){
+  const el=$('#usage');el.textContent='';
+  try{
+    const used=library.reduce((a,c)=>a+(c.bytes||0),0);
+    let t=library.length?`${library.length} saved, ${fmtMB(used)} of comic pages on this phone.`:'';
+    if(navigator.storage&&navigator.storage.estimate){const e=await navigator.storage.estimate();if(e.quota)t+=` Storage available to this app: about ${fmtMB(Math.max(0,e.quota-(e.usage||0)))}.`;}
+    el.textContent=t.trim();
+  }catch(e){}
+}
+
+/* ---------- CBZ export ---------- */
+function crc32(u8){
+  if(!crc32.t){crc32.t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;crc32.t[n]=c>>>0;}}
+  let c=0xFFFFFFFF;for(let i=0;i<u8.length;i++)c=crc32.t[(c^u8[i])&255]^(c>>>8);
+  return (c^0xFFFFFFFF)>>>0;
+}
+async function exportCbz(meta,btn){
+  const label=btn.textContent;btn.disabled=true;
+  try{
+    const enc=new TextEncoder(),parts=[],central=[];let off=0;
+    for(let i=0;i<meta.count;i++){
+      btn.textContent=`Packing ${i+1}/${meta.count}`;
+      const b=await idbGet('pages',meta.id+':'+i);if(!b)continue;
+      const data=new Uint8Array(await b.arrayBuffer());
+      const ext=b.type.includes('webp')?'.webp':b.type.includes('png')?'.png':'.jpg';
+      const name=enc.encode(String(i+1).padStart(4,'0')+ext),crc=crc32(data);
+      const lh=new DataView(new ArrayBuffer(30));
+      lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(8,0,true);
+      lh.setUint16(10,0,true);lh.setUint16(12,0x21,true);lh.setUint32(14,crc,true);lh.setUint32(18,data.length,true);
+      lh.setUint32(22,data.length,true);lh.setUint16(26,name.length,true);lh.setUint16(28,0,true);
+      const ch=new DataView(new ArrayBuffer(46));
+      ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);
+      ch.setUint16(10,0,true);ch.setUint16(12,0,true);ch.setUint16(14,0x21,true);ch.setUint32(16,crc,true);
+      ch.setUint32(20,data.length,true);ch.setUint32(24,data.length,true);ch.setUint16(28,name.length,true);
+      ch.setUint32(42,off,true);
+      parts.push(lh.buffer,name,data);central.push(ch.buffer,name);
+      off+=30+name.length+data.length;
+    }
+    const cdSize=central.reduce((a,p)=>a+(p.byteLength!==undefined?p.byteLength:p.length),0);
+    const end=new DataView(new ArrayBuffer(22));
+    end.setUint32(0,0x06054b50,true);end.setUint16(8,meta.count,true);end.setUint16(10,meta.count,true);
+    end.setUint32(12,cdSize,true);end.setUint32(16,off,true);
+    const blob=new Blob([...parts,...central,end.buffer],{type:'application/vnd.comicbook+zip'});
+    const fname=(meta.title.replace(/[^\w\- ]+/g,'').trim()||'comic')+'.cbz';
+    const file=new File([blob],fname,{type:blob.type});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file]});}
+    else{const a=h('a',{href:URL.createObjectURL(blob),download:fname});document.body.append(a);a.click();a.remove();}
+  }catch(e){if(e&&e.name!=='AbortError')showMsg('error','Export failed',String(e.message||e),[]);}
+  finally{btn.textContent=label;btn.disabled=false;}
+}
+
+/* ---------- reader ---------- */
+const R={meta:null,idx:0,urls:new Map(),pending:new Map(),z:1,tx:0,ty:0,busy:false,playing:false,timer:0,raf:0,uiTimer:0,io:null,io2:null,wake:null,saveT:0};
+const reader=$('#reader'),stage=$('#stage'),strip=$('#strip'),scroller=$('#scroller');
+const step=()=>S.mode==='double'?2:1;
+const dirSign=()=>S.rtl?-1:1;
+function norm(i){i=Math.max(0,Math.min(R.meta.count-1,i));return S.mode==='double'?i-(i%2):i;}
+function viewPages(i){const o=[i];if(S.mode==='double'&&i+1<R.meta.count)o.push(i+1);return o;}
+function pageUrl(i){
+  if(i<0||i>=R.meta.count)return Promise.resolve('');
+  if(R.urls.has(i))return Promise.resolve(R.urls.get(i));
+  if(R.pending.has(i))return R.pending.get(i);
+  const p=idbGet('pages',R.meta.id+':'+i).then(b=>{R.pending.delete(i);if(!b||!R.meta)return '';const u=URL.createObjectURL(b);R.urls.set(i,u);return u;}).catch(()=>{R.pending.delete(i);return '';});
+  R.pending.set(i,p);return p;
+}
+function trimUrls(from,to){for(const [i,u] of R.urls){if(i<from||i>to){URL.revokeObjectURL(u);R.urls.delete(i);}}}
+function freeUrls(){R.urls.forEach(u=>URL.revokeObjectURL(u));R.urls.clear();R.pending.clear();}
+function updateCounter(){
+  const n=R.meta.count,pp=S.mode==='scroll'?[R.idx]:viewPages(R.idx);
+  $('#counter').textContent=(pp.length>1?`${pp[0]+1}–${pp[1]+1}`:`${pp[0]+1}`)+' / '+n;
+  const r=$('#seek');r.max=n;r.value=R.idx+1;
+}
+function makeView(i,role){
+  const v=h('div',{class:'view'+(S.rtl?' rtl':'')});v.dataset.role=role;
+  viewPages(i).forEach(n=>{const im=h('img',{alt:'Page '+(n+1),draggable:'false'});pageUrl(n).then(u=>{if(u)im.src=u;});v.append(im);});
+  return v;
+}
+function renderStage(){
+  const i=R.idx,st=step(),d=dirSign();
+  strip.replaceChildren();strip.style.transition='none';strip.style.transform='translateX(0)';
+  R.z=1;R.tx=R.ty=0;
+  const cur=makeView(i,'cur');cur.style.left='0';strip.append(cur);
+  if(i-st>=0){const p=makeView(i-st,'prev');p.style.left=(-d*100)+'%';strip.append(p);}
+  if(i+st<R.meta.count){const n=makeView(i+st,'next');n.style.left=(d*100)+'%';strip.append(n);}
+  pageUrl(i+st*2);pageUrl(i+st*2+1);
+  trimUrls(i-st*2,i+st*3+1);
+  updateCounter();
+}
+function go(dir){
+  if(R.busy||S.mode==='scroll')return false;
+  const st=step(),t=R.idx+dir*st,d=dirSign();
+  if(t<0||t>=R.meta.count){
+    strip.style.transition='transform .15s ease';strip.style.transform=`translateX(${-dir*d*24}px)`;
+    setTimeout(()=>{strip.style.transform='translateX(0)';},150);return false;
+  }
+  R.busy=true;
+  strip.style.transition='transform .22s ease';strip.style.transform=`translateX(${-dir*d*100}%)`;
+  setTimeout(()=>{R.idx=norm(t);renderStage();saveLater();R.busy=false;},235);
+  return true;
+}
+function snapBack(){strip.style.transition='transform .18s ease';strip.style.transform='translateX(0)';}
+function applyZoom(){
+  const cur=strip.querySelector('[data-role=cur]');if(!cur)return;
+  const mx=(R.z-1)*stage.clientWidth/2,my=(R.z-1)*stage.clientHeight/2;
+  R.tx=Math.max(-mx,Math.min(mx,R.tx));R.ty=Math.max(-my,Math.min(my,R.ty));
+  cur.style.transform=`translate(${R.tx}px,${R.ty}px) scale(${R.z})`;
+}
+function toggleZoom(x,y){
+  if(R.z>1){R.z=1;R.tx=R.ty=0;}
+  else{R.z=2.5;R.tx=(x-stage.clientWidth/2)*(1-R.z);R.ty=(y-stage.clientHeight/2)*(1-R.z);}
+  applyZoom();
+}
+function tapZone(x){
+  const f=x/stage.clientWidth;
+  if(f<0.3)go(S.rtl?1:-1);else if(f>0.7)go(S.rtl?-1:1);else toggleUI();
+}
+const pts=new Map();let g=null,pinch=null,lastTap=0,tapTimer=0;
+stage.addEventListener('pointerdown',e=>{
+  try{stage.setPointerCapture(e.pointerId);}catch(x){}
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pts.size===1)g={sx:e.clientX,sy:e.clientY,moved:false,dx:0,horiz:false,tx0:R.tx,ty0:R.ty};
+  else if(pts.size===2){const [a,b]=[...pts.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y)||1,z:R.z};if(g)g.moved=true;}
+});
+stage.addEventListener('pointermove',e=>{
+  if(!pts.has(e.pointerId))return;
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pts.size>=2&&pinch){const [a,b]=[...pts.values()];R.z=Math.max(1,Math.min(5,pinch.z*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d));if(R.z===1)R.tx=R.ty=0;applyZoom();return;}
+  if(!g||R.busy)return;
+  const dx=e.clientX-g.sx,dy=e.clientY-g.sy;
+  if(Math.abs(dx)>8||Math.abs(dy)>8)g.moved=true;
+  if(!g.moved)return;
+  g.dx=dx;
+  if(R.z>1){R.tx=g.tx0+dx;R.ty=g.ty0+dy;applyZoom();}
+  else if(g.horiz||Math.abs(dx)>Math.abs(dy)){g.horiz=true;strip.style.transition='none';strip.style.transform=`translateX(${dx}px)`;}
+});
+function endPtr(e){
+  if(!pts.has(e.pointerId))return;
+  pts.delete(e.pointerId);
+  if(pinch){if(pts.size<2){pinch=null;g=null;if(R.z<1.05){R.z=1;R.tx=R.ty=0;applyZoom();}}return;}
+  if(pts.size>0||!g)return;
+  const gg=g;g=null;
+  if(R.busy)return;
+  if(!gg.moved){
+    const now=Date.now();
+    if(now-lastTap<300){clearTimeout(tapTimer);lastTap=0;toggleZoom(e.clientX,e.clientY);return;}
+    lastTap=now;const x=e.clientX;tapTimer=setTimeout(()=>tapZone(x),260);return;
+  }
+  if(R.z===1&&gg.horiz){
+    const d=dirSign(),th=Math.min(80,stage.clientWidth*0.2);
+    if(gg.dx<-th){if(!go(d))snapBack();}
+    else if(gg.dx>th){if(!go(-d))snapBack();}
+    else snapBack();
+  }
+}
+stage.addEventListener('pointerup',endPtr);
+stage.addEventListener('pointercancel',endPtr);
+
+function renderScroll(){
+  scroller.replaceChildren();
+  if(R.io)R.io.disconnect();if(R.io2)R.io2.disconnect();
+  R.io=new IntersectionObserver(es=>es.forEach(en=>{
+    if(en.isIntersecting&&!en.target.src){const i=+en.target.dataset.i;pageUrl(i).then(u=>{if(u)en.target.src=u;});}
+  }),{root:scroller,rootMargin:'150% 0px'});
+  R.io2=new IntersectionObserver(es=>es.forEach(en=>{
+    if(en.isIntersecting&&en.intersectionRatio>=0.4){R.idx=+en.target.dataset.i;updateCounter();saveLater();}
+  }),{root:scroller,threshold:[0.4]});
+  R.meta.dims.forEach((d,i)=>{
+    const im=h('img',{alt:'Page '+(i+1),draggable:'false'});im.dataset.i=i;im.style.aspectRatio=d[0]+'/'+d[1];
+    scroller.append(im);R.io.observe(im);R.io2.observe(im);
+  });
+  updateCounter();
+  const t=scroller.children[R.idx];if(t)t.scrollIntoView({block:'start'});
+}
+function applyMode(){
+  stopPlay();
+  if(R.io){R.io.disconnect();R.io=null;}if(R.io2){R.io2.disconnect();R.io2=null;}
+  freeUrls();
+  stage.hidden=S.mode==='scroll';scroller.hidden=S.mode!=='scroll';
+  if(S.mode==='scroll'){strip.replaceChildren();renderScroll();}
+  else{scroller.replaceChildren();R.idx=norm(R.idx);renderStage();}
+  document.querySelectorAll('#segMode button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===S.mode)));
+  document.querySelectorAll('#segDir button').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.rtl==='1')===S.rtl)));
+  $('#sec').value=String(S.sec);
+}
+function saveLater(){
+  clearTimeout(R.saveT);
+  R.saveT=setTimeout(()=>{if(R.meta){R.meta.last=R.idx;idbPutMeta(R.meta).catch(()=>{});}},600);
+}
+function showUI(on){reader.classList.toggle('ui-off',!on);clearTimeout(R.uiTimer);}
+function toggleUI(){showUI(reader.classList.contains('ui-off'));}
+
+function stopPlay(){
+  R.playing=false;clearInterval(R.timer);cancelAnimationFrame(R.raf);
+  $('#rPlay').innerHTML=IC.play;$('#rPlay').setAttribute('aria-label','Start auto-play');
+}
+function startPlay(){
+  R.playing=true;$('#rPlay').innerHTML=IC.pause;$('#rPlay').setAttribute('aria-label','Stop auto-play');
+  showUI(false);
+  if(S.mode==='scroll'){
+    const pps=Math.max(25,420/S.sec);let last=performance.now(),acc=0;
+    const tick=now=>{
+      if(!R.playing)return;
+      acc+=(now-last)/1000*pps;last=now;
+      if(acc>=1){const m=Math.floor(acc);scroller.scrollTop+=m;acc-=m;}
+      if(scroller.scrollTop+scroller.clientHeight>=scroller.scrollHeight-2){stopPlay();return;}
+      R.raf=requestAnimationFrame(tick);
+    };
+    R.raf=requestAnimationFrame(tick);
+  }else{
+    R.timer=setInterval(()=>{if(!go(1))stopPlay();},S.sec*1000);
+  }
+}
+async function wake(){
+  try{if('wakeLock' in navigator&&!R.wake){R.wake=await navigator.wakeLock.request('screen');R.wake.addEventListener('release',()=>{R.wake=null;});}}catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!reader.hidden)wake();});
+
+function openComic(id){
+  const meta=library.find(c=>c.id===id);if(!meta)return;
+  R.meta=meta;R.idx=Math.min(meta.last||0,meta.count-1);
+  meta.opened=Date.now();idbPutMeta(meta).catch(()=>{});
+  reader.hidden=false;document.body.style.overflow='hidden';
+  $('#rtitle').textContent=meta.title;
+  $('#sheet').hidden=true;showUI(true);applyMode();wake();
+  R.uiTimer=setTimeout(()=>showUI(false),2200);
+}
+function closeReader(){
+  stopPlay();clearTimeout(R.saveT);
+  if(R.meta){R.meta.last=R.idx;idbPutMeta(R.meta).catch(()=>{});}
+  if(R.io){R.io.disconnect();R.io=null;}if(R.io2){R.io2.disconnect();R.io2=null;}
+  freeUrls();strip.replaceChildren();scroller.replaceChildren();
+  try{if(R.wake){R.wake.release();R.wake=null;}}catch(e){}
+  try{if(document.fullscreenElement)document.exitFullscreen();}catch(e){}
+  reader.hidden=true;document.body.style.overflow='';R.meta=null;
+  refreshLibrary();
+}
+$('#rBack').addEventListener('click',closeReader);
+$('#rNext').addEventListener('click',()=>{if(S.mode==='scroll')scroller.scrollBy({top:scroller.clientHeight*0.9,behavior:'smooth'});else go(S.rtl?-1:1);});
+$('#rPrev').addEventListener('click',()=>{if(S.mode==='scroll')scroller.scrollBy({top:-scroller.clientHeight*0.9,behavior:'smooth'});else go(S.rtl?1:-1);});
+$('#rPlay').addEventListener('click',()=>{R.playing?stopPlay():startPlay();});
+$('#rMore').addEventListener('click',()=>{$('#sheet').hidden=false;});
+$('#sheetClose').addEventListener('click',()=>{$('#sheet').hidden=true;});
+$('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')$('#sheet').hidden=true;});
+$('#seek').addEventListener('input',e=>{
+  const v=+e.target.value-1;
+  if(S.mode==='scroll'){const t=scroller.children[v];if(t)t.scrollIntoView({block:'start'});}
+  else{R.idx=norm(v);renderStage();saveLater();}
+});
+$('#segMode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.mode=b.dataset.mode;saveSettings();applyMode();});
+$('#segDir').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.rtl=b.dataset.rtl==='1';saveSettings();applyMode();});
+$('#sec').addEventListener('change',e=>{S.sec=+e.target.value;saveSettings();if(R.playing){stopPlay();startPlay();}});
+const fsOK=document.fullscreenEnabled||document.webkitFullscreenEnabled;
+if(!fsOK)$('#fsBtn').hidden=true;
+$('#fsBtn').addEventListener('click',()=>{
+  try{if(document.fullscreenElement)document.exitFullscreen();else reader.requestFullscreen();}catch(e){}
+});
+document.addEventListener('keydown',e=>{
+  if(reader.hidden)return;
+  if(e.key==='ArrowRight')go(S.rtl?-1:1);
+  else if(e.key==='ArrowLeft')go(S.rtl?1:-1);
+  else if(e.key==='Escape'){if(!$('#sheet').hidden)$('#sheet').hidden=true;else closeReader();}
+});
+
+refreshLibrary();
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+})();
+</script>
+</body></html>
